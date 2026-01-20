@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -162,9 +162,6 @@ static void Wayland_DeleteDevice(SDL_VideoDevice *device)
         WAYLAND_wl_display_flush(data->display);
         WAYLAND_wl_display_disconnect(data->display);
     }
-    if (device->wakeup_lock) {
-        SDL_DestroyMutex(device->wakeup_lock);
-    }
     SDL_free(data);
     SDL_free(device);
     SDL_WAYLAND_UnloadSymbols();
@@ -233,7 +230,6 @@ static SDL_VideoDevice *Wayland_CreateDevice(void)
     }
 
     device->driverdata = data;
-    device->wakeup_lock = SDL_CreateMutex();
 
     /* Set the function pointers */
     device->VideoInit = Wayland_VideoInit;

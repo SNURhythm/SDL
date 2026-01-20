@@ -755,6 +755,11 @@ if(MSVC)
   if(MSVC_VERSION GREATER 1926 AND CMAKE_GENERATOR_PLATFORM MATCHES "Win32|x64")
     list(APPEND EXTRA_LDFLAGS_BUILD "-CETCOMPAT")
   endif()
+
+  # for VS >= 17.14 targeting ARM64: inline the Interlocked funcs
+  if(MSVC_VERSION GREATER 1943 AND SDL_CPU_ARM64 AND NOT SDL_LIBC)
+    list(APPEND EXTRA_CFLAGS /forceInterlockedFunctions-)
+  endif()
 endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
@@ -931,7 +936,17 @@ if(SDL_ASSEMBLY)
       cmake_pop_check_state()
 
       if(CPU_SUPPORTS_LSX AND HAVE_LSXINTRIN_H)
-        list(APPEND EXTRA_CFLAGS "-mlsx")
+        set_property(SOURCE
+            "${SDL2_SOURCE_DIR}/src/video/yuv2rgb/yuv_rgb_lsx.c"
+            "${SDL2_SOURCE_DIR}/src/video/SDL_blit_A.c"
+            "${SDL2_SOURCE_DIR}/src/video/SDL_fillrect.c"
+            APPEND PROPERTY COMPILE_OPTIONS "-mlsx")
+
+        set_property(SOURCE
+            "${SDL2_SOURCE_DIR}/src/video/yuv2rgb/yuv_rgb_lsx.c"
+            "${SDL2_SOURCE_DIR}/src/video/SDL_blit_A.c"
+            "${SDL2_SOURCE_DIR}/src/video/SDL_fillrect.c"
+            PROPERTY SKIP_PRECOMPILE_HEADERS 1)
         set(HAVE_LSX TRUE)
       endif()
     endif()
@@ -1094,6 +1109,7 @@ if(SDL_LIBC)
     endforeach()
 
     check_symbol_exists(sigaction "signal.h" HAVE_SIGACTION)
+    check_symbol_exists(sigtimedwait "signal.h" HAVE_SIGTIMEDWAIT)
     check_symbol_exists(setjmp "setjmp.h" HAVE_SETJMP)
     check_symbol_exists(nanosleep "time.h" HAVE_NANOSLEEP)
     check_symbol_exists(sysconf "unistd.h" HAVE_SYSCONF)
@@ -1465,10 +1481,14 @@ elseif(EMSCRIPTEN)
 elseif(UNIX AND NOT APPLE AND NOT RISCOS AND NOT HAIKU)
   if(SDL_AUDIO)
     if(SYSV5 OR SOLARIS OR HPUX)
-        set(SDL_AUDIO_DRIVER_SUNAUDIO 1)
-        file(GLOB SUN_AUDIO_SOURCES ${SDL2_SOURCE_DIR}/src/audio/sun/*.c)
-        list(APPEND SOURCE_FILES ${SUN_AUDIO_SOURCES})
-        set(HAVE_SDL_AUDIO TRUE)
+        # Newer Solaris-based systems, like OpenIndiana, don't have this interface anymore. Check for the header first.
+        check_include_file(sys/audioio.h HAVE_SYS_AUDIOIO_H)
+        if(HAVE_SYS_AUDIOIO_H)
+            set(SDL_AUDIO_DRIVER_SUNAUDIO 1)
+            file(GLOB SUN_AUDIO_SOURCES ${SDL2_SOURCE_DIR}/src/audio/sun/*.c)
+            list(APPEND SOURCE_FILES ${SUN_AUDIO_SOURCES})
+            set(HAVE_SDL_AUDIO TRUE)
+        endif()
     elseif(NETBSD)
         set(SDL_AUDIO_DRIVER_NETBSD 1)
         file(GLOB NETBSD_AUDIO_SOURCES ${SDL2_SOURCE_DIR}/src/audio/netbsd/*.c)
@@ -1829,8 +1849,10 @@ elseif(WINDOWS)
       set(HAVE_DIRECTX TRUE)
       if(NOT MINGW AND NOT USE_WINSDK_DIRECTX)
       # TODO: change $ENV{DXSDL_DIR} to get the path from the include checks
-        target_link_directories(sdl-build-options INTERFACE "$$ENV{DXSDK_DIR}\\lib\\${PROCESSOR_ARCH}")
-        target_include_directories(sdl-build-options INTERFACE "$ENV{DXSDK_DIR}\\Include")
+        file(TO_CMAKE_PATH "$ENV{DXSDK_DIR}\\lib\\${PROCESSOR_ARCH}" SDL2_TMP_DXSDK_LIB_DIR)
+        target_link_directories(sdl-build-options INTERFACE "${SDL2_TMP_DXSDK_LIB_DIR}")
+        file(TO_CMAKE_PATH "$ENV{DXSDK_DIR}\\Include" SDL2_TMP_DXSDK_INCLUDE_DIR)
+        target_include_directories(sdl-build-options INTERFACE "${SDL2_TMP_DXSDK_INCLUDE_DIR}")
       endif()
     endif()
     set(CMAKE_REQUIRED_FLAGS ${ORIG_CMAKE_REQUIRED_FLAGS})
