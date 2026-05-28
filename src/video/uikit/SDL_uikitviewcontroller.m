@@ -560,15 +560,17 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
 
 - (void)clearComposition
 {
-    if (textField == nil || (textField.markedTextRange == nil && !hasMarkedText)) {
+    if (textField == nil) {
         return;
     }
 
     clearingComposition = YES;
-    if (textField.markedTextRange != nil) {
-        [textField replaceRange:textField.markedTextRange withText:@""];
-    }
     [textField unmarkText];
+    textField.text = obligateForBackspace;
+    UITextPosition *end = textField.endOfDocument;
+    if (end != nil) {
+        textField.selectedTextRange = [textField textRangeFromPosition:end toPosition:end];
+    }
     committedText = textField.text;
     clearingComposition = NO;
 
