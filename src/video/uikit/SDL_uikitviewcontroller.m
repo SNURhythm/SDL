@@ -87,6 +87,7 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
     BOOL showingKeyboard;
     BOOL hidingKeyboard;
     BOOL rotatingOrientation;
+    BOOL hasMarkedText;
     NSString *committedText;
     NSString *obligateForBackspace;
 #endif
@@ -105,6 +106,7 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
         showingKeyboard = NO;
         hidingKeyboard = NO;
         rotatingOrientation = NO;
+        hasMarkedText = NO;
 #endif
 
 #if TARGET_OS_TV
@@ -489,7 +491,31 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
 
 - (void)textFieldTextDidChange:(NSNotification *)notification
 {
-    if (textField.markedTextRange == nil) {
+    if (textField.markedTextRange != nil) {
+        NSString *markedText = [textField textInRange:textField.markedTextRange];
+        UITextRange *selectedRange = textField.selectedTextRange;
+        NSInteger selectedStart = 0;
+        NSInteger selectedLength = 0;
+
+        if (markedText == nil) {
+            markedText = @"";
+        }
+        if (selectedRange != nil) {
+            selectedStart = [textField offsetFromPosition:textField.markedTextRange.start
+                                               toPosition:selectedRange.start];
+            selectedLength = [textField offsetFromPosition:selectedRange.start
+                                                toPosition:selectedRange.end];
+        }
+
+        hasMarkedText = YES;
+        SDL_SendEditingText([markedText UTF8String], (int)SDL_max(0, selectedStart),
+                            (int)SDL_max(0, selectedLength));
+    } else {
+        if (hasMarkedText) {
+            SDL_SendEditingText("", 0, 0);
+            hasMarkedText = NO;
+        }
+
         NSUInteger compareLength = SDL_min(textField.text.length, committedText.length);
         NSUInteger matchLength;
 
