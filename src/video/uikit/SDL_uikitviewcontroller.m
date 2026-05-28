@@ -88,6 +88,7 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
     BOOL hidingKeyboard;
     BOOL rotatingOrientation;
     BOOL hasMarkedText;
+    BOOL clearingComposition;
     NSString *committedText;
     NSString *obligateForBackspace;
 #endif
@@ -107,6 +108,7 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
         hidingKeyboard = NO;
         rotatingOrientation = NO;
         hasMarkedText = NO;
+        clearingComposition = NO;
 #endif
 
 #if TARGET_OS_TV
@@ -491,6 +493,11 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
 
 - (void)textFieldTextDidChange:(NSNotification *)notification
 {
+    if (clearingComposition) {
+        committedText = textField.text;
+        return;
+    }
+
     if (textField.markedTextRange != nil) {
         NSString *markedText = [textField textInRange:textField.markedTextRange];
         UITextRange *selectedRange = textField.selectedTextRange;
@@ -549,6 +556,24 @@ SDL_HideHomeIndicatorHintChanged(void *userdata, const char *name, const char *o
         }
         committedText = textField.text;
     }
+}
+
+- (void)clearComposition
+{
+    if (textField == nil || (textField.markedTextRange == nil && !hasMarkedText)) {
+        return;
+    }
+
+    clearingComposition = YES;
+    if (textField.markedTextRange != nil) {
+        [textField replaceRange:textField.markedTextRange withText:@""];
+    }
+    [textField unmarkText];
+    committedText = textField.text;
+    clearingComposition = NO;
+
+    hasMarkedText = NO;
+    SDL_SendEditingText("", 0, 0);
 }
 
 - (void)updateKeyboard
@@ -677,6 +702,16 @@ void UIKit_SetTextInputRect(_THIS, const SDL_Rect *rect)
             if (vc.keyboardVisible) {
                 [vc updateKeyboard];
             }
+        }
+    }
+}
+
+void UIKit_ClearComposition(_THIS)
+{
+    @autoreleasepool {
+        SDL_uikitviewcontroller *vc = GetWindowViewController(SDL_GetFocusWindow());
+        if (vc != nil) {
+            [vc clearComposition];
         }
     }
 }
