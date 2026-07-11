@@ -40,6 +40,9 @@
 #if TARGET_OS_IOS
 #define SDL_JOYSTICK_iOS_ACCELEROMETER
 #import <CoreMotion/CoreMotion.h>
+#ifdef SDL_SENSOR_COREMOTION
+#include "../../sensor/coremotion/SDL_coremotionsensor.h"
+#endif
 #endif
 
 #if defined(__MACOSX__)
@@ -999,7 +1002,11 @@ static int IOS_JoystickOpen(SDL_Joystick *joystick, int device_index)
         if (device->accelerometer) {
 #ifdef SDL_JOYSTICK_iOS_ACCELEROMETER
             if (motionManager == nil) {
+#ifdef SDL_SENSOR_COREMOTION
+                motionManager = SDL_COREMOTION_GetMotionManager();
+#else
                 motionManager = [[CMMotionManager alloc] init];
+#endif
             }
 
             /* Shorter times between updates can significantly increase CPU usage. */

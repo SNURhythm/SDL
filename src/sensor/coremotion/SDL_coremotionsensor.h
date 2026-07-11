@@ -20,10 +20,16 @@
 */
 #include "SDL_config.h"
 
+#ifdef __OBJC__
+@class CMMotionManager;
+extern CMMotionManager *SDL_COREMOTION_GetMotionManager(void);
+#endif
+
 /* The private structure used to keep track of a sensor */
 struct sensor_hwdata
 {
-    float data[3];
+    Uint64 timestamp_us;
+    float data[8];
 };
 
 /* vi: set ts=4 sw=4 expandtab: */
