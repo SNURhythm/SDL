@@ -48,6 +48,27 @@ static SDL_SpinLock s_rawTouchLock;
 static IOSRawTouchEvent s_rawTouchEvents[512];
 static size_t s_rawTouchReadIndex;
 static size_t s_rawTouchCount;
+static IOSRawTouchEventSink s_rawTouchSink;
+static void *s_rawTouchSinkContext;
+static SDL_atomic_t s_applicationRunsAsynchronously;
+
+void IOSSetRawTouchEventSink(IOSRawTouchEventSink sink, void *context)
+{
+    SDL_AtomicLock(&s_rawTouchLock);
+    s_rawTouchSink = sink;
+    s_rawTouchSinkContext = context;
+    SDL_AtomicUnlock(&s_rawTouchLock);
+}
+
+void IOSSetApplicationRunsAsynchronously(SDL_bool asynchronous)
+{
+    SDL_AtomicSet(&s_applicationRunsAsynchronously, asynchronous ? 1 : 0);
+}
+
+SDL_bool IOSApplicationRunsAsynchronously(void)
+{
+    return SDL_AtomicGet(&s_applicationRunsAsynchronously) != 0 ? SDL_TRUE : SDL_FALSE;
+}
 
 void IOSPushRawTouchEvent(IOSRawTouchPhase phase, Sint64 fingerId,
                           float normalizedX, float normalizedY, float pressure,
@@ -64,6 +85,9 @@ void IOSPushRawTouchEvent(IOSRawTouchPhase phase, Sint64 fingerId,
     rawTouchEvent.phase = phase;
 
     SDL_AtomicLock(&s_rawTouchLock);
+    if (s_rawTouchSink != NULL) {
+        s_rawTouchSink(&rawTouchEvent, s_rawTouchSinkContext);
+    }
     writeIndex = (s_rawTouchReadIndex + s_rawTouchCount) % SDL_arraysize(s_rawTouchEvents);
     s_rawTouchEvents[writeIndex] = rawTouchEvent;
     if (s_rawTouchCount == SDL_arraysize(s_rawTouchEvents)) {

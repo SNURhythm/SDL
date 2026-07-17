@@ -47,6 +47,9 @@ typedef struct IOSRawTouchEvent
     IOSRawTouchPhase phase;
 } IOSRawTouchEvent;
 
+typedef void (SDLCALL *IOSRawTouchEventSink)(const IOSRawTouchEvent *event,
+                                             void *context);
+
 extern DECLSPEC void SDLCALL IOSPushRawTouchEvent(IOSRawTouchPhase phase,
                                                   Sint64 fingerId,
                                                   float normalizedX,
@@ -55,6 +58,11 @@ extern DECLSPEC void SDLCALL IOSPushRawTouchEvent(IOSRawTouchPhase phase,
                                                   Uint64 timestampMicros);
 extern DECLSPEC size_t SDLCALL IOSPopRawTouchEvents(IOSRawTouchEvent *buffer,
                                                     size_t maxEvents);
+extern DECLSPEC void SDLCALL
+IOSSetRawTouchEventSink(IOSRawTouchEventSink sink, void *context);
+extern DECLSPEC void SDLCALL
+IOSSetApplicationRunsAsynchronously(SDL_bool asynchronous);
+extern DECLSPEC SDL_bool SDLCALL IOSApplicationRunsAsynchronously(void);
 
 #ifdef __cplusplus
 }
