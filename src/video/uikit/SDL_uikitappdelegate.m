@@ -26,7 +26,6 @@
 #include "SDL_hints.h"
 #include "SDL_system.h"
 #include "SDL_main.h"
-#include "../../../include/SDL_uikit_rawtouch.h"
 
 #import "SDL_uikitappdelegate.h"
 #import "SDL_uikitmodes.h"
@@ -398,9 +397,7 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
     /* run the user's application, passing argc and argv */
     SDL_iPhoneSetEventPump(SDL_TRUE);
     exit_status = forward_main(forward_argc, forward_argv);
-    if (!IOSApplicationRunsAsynchronously()) {
-        SDL_iPhoneSetEventPump(SDL_FALSE);
-    }
+    SDL_iPhoneSetEventPump(SDL_FALSE);
 
     if (launchWindow) {
         launchWindow.hidden = YES;

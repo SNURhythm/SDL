@@ -50,7 +50,6 @@ static size_t s_rawTouchReadIndex;
 static size_t s_rawTouchCount;
 static IOSRawTouchEventSink s_rawTouchSink;
 static void *s_rawTouchSinkContext;
-static SDL_atomic_t s_applicationRunsAsynchronously;
 
 void IOSSetRawTouchEventSink(IOSRawTouchEventSink sink, void *context)
 {
@@ -58,16 +57,6 @@ void IOSSetRawTouchEventSink(IOSRawTouchEventSink sink, void *context)
     s_rawTouchSink = sink;
     s_rawTouchSinkContext = context;
     SDL_AtomicUnlock(&s_rawTouchLock);
-}
-
-void IOSSetApplicationRunsAsynchronously(SDL_bool asynchronous)
-{
-    SDL_AtomicSet(&s_applicationRunsAsynchronously, asynchronous ? 1 : 0);
-}
-
-SDL_bool IOSApplicationRunsAsynchronously(void)
-{
-    return SDL_AtomicGet(&s_applicationRunsAsynchronously) != 0 ? SDL_TRUE : SDL_FALSE;
 }
 
 void IOSPushRawTouchEvent(IOSRawTouchPhase phase, Sint64 fingerId,

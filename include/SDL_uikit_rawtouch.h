@@ -60,9 +60,6 @@ extern DECLSPEC size_t SDLCALL IOSPopRawTouchEvents(IOSRawTouchEvent *buffer,
                                                     size_t maxEvents);
 extern DECLSPEC void SDLCALL
 IOSSetRawTouchEventSink(IOSRawTouchEventSink sink, void *context);
-extern DECLSPEC void SDLCALL
-IOSSetApplicationRunsAsynchronously(SDL_bool asynchronous);
-extern DECLSPEC SDL_bool SDLCALL IOSApplicationRunsAsynchronously(void);
 
 #ifdef __cplusplus
 }
