@@ -132,6 +132,95 @@ static SDL_JoystickDeviceItem *deviceList = NULL;
 static int numjoysticks = 0;
 int SDL_AppleTVRemoteOpenedAsJoystick = 0;
 
+#ifdef SDL_JOYSTICK_MFI
+static void IOS_MFIJoystickUpdate(SDL_Joystick *joystick);
+
+static void IOS_UpdateControllerStateAsynchronously(GCController *controller)
+{
+    SDL_JoystickDeviceItem *device;
+
+    SDL_LockJoysticks();
+    for (device = deviceList; device != NULL; device = device->next) {
+        if (device->controller == controller && device->joystick != NULL) {
+            IOS_MFIJoystickUpdate(device->joystick);
+            break;
+        }
+    }
+    SDL_UnlockJoysticks();
+}
+
+static void IOS_SetControllerAsyncInputEnabled(GCController *controller, BOOL enabled)
+{
+    if (controller == nil) {
+        return;
+    }
+
+    if (enabled) {
+        dispatch_queue_t queue = dispatch_queue_create("org.libsdl.input.controller", DISPATCH_QUEUE_SERIAL);
+        dispatch_set_target_queue(queue, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0));
+        controller.handlerQueue = queue;
+    }
+
+    if (@available(macOS 13.0, iOS 16.0, tvOS 16.0, *)) {
+        controller.physicalInputProfile.valueDidChangeHandler = enabled ? ^(GCPhysicalInputProfile *profile, GCControllerElement *element) {
+            (void)profile;
+            (void)element;
+            IOS_UpdateControllerStateAsynchronously(controller);
+        } : nil;
+        return;
+    }
+
+    if (@available(macOS 11.0, iOS 14.0, tvOS 14.0, *)) {
+        for (GCControllerElement *element in controller.physicalInputProfile.allElements) {
+            if ([element isKindOfClass:[GCControllerButtonInput class]]) {
+                ((GCControllerButtonInput *)element).valueChangedHandler = enabled ? ^(GCControllerButtonInput *button, float value, BOOL pressed) {
+                    (void)button;
+                    (void)value;
+                    (void)pressed;
+                    IOS_UpdateControllerStateAsynchronously(controller);
+                } : nil;
+            } else if ([element isKindOfClass:[GCControllerAxisInput class]]) {
+                ((GCControllerAxisInput *)element).valueChangedHandler = enabled ? ^(GCControllerAxisInput *axis, float value) {
+                    (void)axis;
+                    (void)value;
+                    IOS_UpdateControllerStateAsynchronously(controller);
+                } : nil;
+            } else if ([element isKindOfClass:[GCControllerDirectionPad class]]) {
+                ((GCControllerDirectionPad *)element).valueChangedHandler = enabled ? ^(GCControllerDirectionPad *dpad, float xValue, float yValue) {
+                    (void)dpad;
+                    (void)xValue;
+                    (void)yValue;
+                    IOS_UpdateControllerStateAsynchronously(controller);
+                } : nil;
+            }
+        }
+        return;
+    }
+
+    if (controller.extendedGamepad != nil) {
+        controller.extendedGamepad.valueChangedHandler = enabled ? ^(GCExtendedGamepad *gamepad, GCControllerElement *element) {
+            (void)gamepad;
+            (void)element;
+            IOS_UpdateControllerStateAsynchronously(controller);
+        } : nil;
+    } else if (controller.gamepad != nil) {
+        controller.gamepad.valueChangedHandler = enabled ? ^(GCGamepad *gamepad, GCControllerElement *element) {
+            (void)gamepad;
+            (void)element;
+            IOS_UpdateControllerStateAsynchronously(controller);
+        } : nil;
+#if TARGET_OS_TV
+    } else if (controller.microGamepad != nil) {
+        controller.microGamepad.valueChangedHandler = enabled ? ^(GCMicroGamepad *gamepad, GCControllerElement *element) {
+            (void)gamepad;
+            (void)element;
+            IOS_UpdateControllerStateAsynchronously(controller);
+        } : nil;
+#endif
+    }
+}
+#endif
+
 static SDL_JoystickDeviceItem *GetDeviceForIndex(int device_index)
 {
     SDL_JoystickDeviceItem *device = deviceList;
@@ -794,6 +883,7 @@ static SDL_JoystickDeviceItem *IOS_RemoveJoystickDevice(SDL_JoystickDeviceItem *
         /* These were explicitly retained in the struct, so they should be explicitly released before freeing the struct. */
         if (device->controller) {
             GCController *controller = CFBridgingRelease((__bridge CFTypeRef)(device->controller));
+            IOS_SetControllerAsyncInputEnabled(controller, NO);
             controller.controllerPausedHandler = nil;
             device->controller = nil;
         }
@@ -1015,6 +1105,7 @@ static int IOS_JoystickOpen(SDL_Joystick *joystick, int device_index)
 #endif
         } else {
 #ifdef SDL_JOYSTICK_MFI
+            IOS_SetControllerAsyncInputEnabled(device->controller, YES);
             if (device->pause_button_index >= 0) {
                 GCController *controller = device->controller;
                 controller.controllerPausedHandler = ^(GCController *c) {
@@ -1801,6 +1892,7 @@ static void IOS_JoystickClose(SDL_Joystick *joystick)
         } else if (device->controller) {
 #ifdef SDL_JOYSTICK_MFI
             GCController *controller = device->controller;
+            IOS_SetControllerAsyncInputEnabled(controller, NO);
             controller.controllerPausedHandler = nil;
             controller.playerIndex = -1;
 
