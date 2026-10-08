@@ -207,11 +207,25 @@ int UIKit_CreateWindow(_THIS, SDL_Window *window)
 
         /* ignore the size user requested, and make a fullscreen window */
         /* !!! FIXME: can we have a smaller view? */
-        uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
+        uiwindow = nil;
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+        if (@available(iOS 13.0, tvOS 13.0, *)) {
+            UIWindowScene *scene = UIKit_GetWindowScene(data.uiscreen);
+            if (scene) {
+                uiwindow = [[SDL_uikitwindow alloc] initWithWindowScene:scene];
+                uiwindow.frame = scene.coordinateSpace.bounds;
+            } else if (UIKit_UsesSceneLifecycle()) {
+                return SDL_SetError("No connected window scene for this display.");
+            }
+        }
+#endif
+        if (!uiwindow) {
+            uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
 
-        /* put the window on an external display if appropriate. */
-        if (data.uiscreen != [UIScreen mainScreen]) {
-            [uiwindow setScreen:data.uiscreen];
+            /* put the window on an external display if appropriate. */
+            if (data.uiscreen != [UIScreen mainScreen]) {
+                [uiwindow setScreen:data.uiscreen];
+            }
         }
 
         if (SetupWindowData(_this, window, uiwindow, SDL_TRUE) < 0) {

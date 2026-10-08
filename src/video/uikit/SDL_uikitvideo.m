@@ -34,6 +34,7 @@
 #include "SDL_uikitvideo.h"
 #include "SDL_uikitevents.h"
 #include "SDL_uikitmodes.h"
+#import "SDL_uikitappdelegate.h"
 #include "SDL_uikitwindow.h"
 #include "SDL_uikitopengles.h"
 #include "SDL_uikitclipboard.h"
@@ -221,7 +222,7 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
      * https://bugzilla.libsdl.org/show_bug.cgi?id=3505
      * https://bugzilla.libsdl.org/show_bug.cgi?id=3465
      * https://forums.developer.apple.com/thread/65337 */
-    orient = [UIApplication sharedApplication].statusBarOrientation;
+    orient = UIKit_GetInterfaceOrientation(UIScreen.mainScreen);
     landscape = UIInterfaceOrientationIsLandscape(orient) ||
                     !(UIKit_GetSupportedOrientations(window) & (UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown));
     fullscreen = CGRectEqualToRect(screen.bounds, frame);

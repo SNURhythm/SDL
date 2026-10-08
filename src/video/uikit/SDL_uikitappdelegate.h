@@ -35,6 +35,7 @@
 + (NSString *)getAppDelegateClassName;
 
 - (void)hideLaunchScreen;
+- (void)processLaunchURLs;
 
 /* This property is marked as optional, and is only intended to be used when
  * the app's UI is storyboard-based. SDL is not storyboard-based, however
@@ -43,5 +44,20 @@
 @property (nonatomic) UIWindow *window;
 
 @end
+
+/* Scene lifecycle support backported for the SNURhythm SDL2 fork. */
+#if (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000) || (__APPLETV_OS_VERSION_MAX_ALLOWED >= 130000)
+#define SDL_UIKIT_SCENE_LIFECYCLE 1
+API_AVAILABLE(ios(13.0), tvos(13.0))
+@interface SDLUIKitSceneDelegate : NSObject<UIWindowSceneDelegate>
+@end
+
+extern UIWindowScene *UIKit_GetWindowScene(UIScreen *screen) API_AVAILABLE(ios(13.0), tvos(13.0));
+#endif
+
+extern BOOL UIKit_UsesSceneLifecycle(void);
+#if !TARGET_OS_TV
+extern UIInterfaceOrientation UIKit_GetInterfaceOrientation(UIScreen *screen);
+#endif
 
 /* vi: set ts=4 sw=4 expandtab: */

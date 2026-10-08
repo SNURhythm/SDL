@@ -26,6 +26,7 @@
 #include "SDL_hints.h"
 #include "SDL_system.h"
 #include "SDL_main.h"
+#include "SDL.h"
 
 #import "SDL_uikitappdelegate.h"
 #import "SDL_uikitmodes.h"
@@ -44,6 +45,62 @@
 #ifdef main
 #undef main
 #endif
+
+/* Scene lifecycle support backported for the SNURhythm SDL2 fork. */
+BOOL UIKit_UsesSceneLifecycle(void)
+{
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        return [NSBundle.mainBundle objectForInfoDictionaryKey:@"UIApplicationSceneManifest"] != nil;
+    }
+#endif
+    return NO;
+}
+
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+UIWindowScene *UIKit_GetWindowScene(UIScreen *screen)
+{
+    UIWindowScene *candidate = nil;
+    for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
+        if ([scene isKindOfClass:UIWindowScene.class] && ((UIWindowScene *)scene).screen == screen) {
+            if (scene.activationState == UISceneActivationStateForegroundActive) {
+                return (UIWindowScene *)scene;
+            }
+            candidate = (UIWindowScene *)scene;
+        }
+    }
+    return candidate;
+}
+#endif
+
+#if !TARGET_OS_TV
+UIInterfaceOrientation UIKit_GetInterfaceOrientation(UIScreen *screen)
+{
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        UIWindowScene *scene = UIKit_GetWindowScene(screen);
+        if (scene) {
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 270000
+            if (@available(iOS 26.0, *)) {
+                return scene.effectiveGeometry.interfaceOrientation;
+            }
+#endif
+            return scene.interfaceOrientation;
+        }
+    }
+#endif
+    return UIApplication.sharedApplication.statusBarOrientation;
+}
+#endif
+
+@interface SDLUIKitDelegate ()
+- (BOOL)startApplication:(UIApplication *)application launchOptions:(NSDictionary *)launchOptions;
+- (void)sendDropFileForURL:(NSURL *)url;
+- (void)queueLaunchURL:(NSURL *)url;
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+- (void)connectWindowScene:(UIWindowScene *)scene API_AVAILABLE(ios(13.0), tvos(13.0));
+#endif
+@end
 
 static SDL_main_func forward_main;
 static int forward_argc;
@@ -89,7 +146,7 @@ SDL_IdleTimerDisabledChanged(void *userdata, const char *name, const char *oldVa
 /* Load a launch image using the old UILaunchImageFile-era naming rules. */
 static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 {
-    UIInterfaceOrientation curorient = [UIApplication sharedApplication].statusBarOrientation;
+    UIInterfaceOrientation curorient = UIKit_GetInterfaceOrientation(UIScreen.mainScreen);
     UIUserInterfaceIdiom idiom = [UIDevice currentDevice].userInterfaceIdiom;
     UIImage *image = nil;
 
@@ -219,7 +276,7 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
         int screenh = (int)([UIScreen mainScreen].bounds.size.height + 0.5);
 
 #if !TARGET_OS_TV
-        UIInterfaceOrientation curorient = [UIApplication sharedApplication].statusBarOrientation;
+        UIInterfaceOrientation curorient = UIKit_GetInterfaceOrientation(UIScreen.mainScreen);
 
         /* We always want portrait-oriented size, to match UILaunchImageSize. */
         if (screenw > screenh) {
@@ -351,6 +408,8 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 
 @implementation SDLUIKitDelegate {
     UIWindow *launchWindow;
+    NSMutableArray<NSURL *> *launchURLs;
+    BOOL applicationStarted;
 }
 
 /* convenience method */
@@ -412,6 +471,19 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    if (UIKit_UsesSceneLifecycle()) {
+        /* SDL_main must wait until UIKit connects a window scene. */
+        return YES;
+    }
+    return [self startApplication:application launchOptions:launchOptions];
+}
+
+- (BOOL)startApplication:(UIApplication *)application launchOptions:(NSDictionary *)launchOptions
+{
+    if (applicationStarted) {
+        return YES;
+    }
+    applicationStarted = YES;
     NSBundle *bundle = [NSBundle mainBundle];
 
 #ifdef SDL_IPHONE_LAUNCHSCREEN
@@ -448,7 +520,18 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
     }
 
     if (vc.view) {
-        launchWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+        if (@available(iOS 13.0, tvOS 13.0, *)) {
+            UIWindowScene *scene = UIKit_GetWindowScene(UIScreen.mainScreen);
+            if (scene) {
+                launchWindow = [[UIWindow alloc] initWithWindowScene:scene];
+                launchWindow.frame = scene.coordinateSpace.bounds;
+            }
+        }
+#endif
+        if (!launchWindow) {
+            launchWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+        }
 
         /* We don't want the launch window immediately hidden when a real SDL
          * window is shown - we fade it out ourselves when we're ready. */
@@ -473,6 +556,44 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
     [self performSelector:@selector(postFinishLaunch) withObject:nil afterDelay:0.0];
 
     return YES;
+}
+
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+- (void)connectWindowScene:(UIWindowScene *)scene
+{
+    if (applicationStarted) {
+        /* UIKit may reconnect a discarded session without restarting the process. */
+        UIWindow *window = self.window;
+        window.windowScene = scene;
+        window.frame = scene.coordinateSpace.bounds;
+        [window makeKeyAndVisible];
+        [self processLaunchURLs];
+    } else {
+        [self startApplication:UIApplication.sharedApplication launchOptions:nil];
+    }
+}
+#endif
+
+- (void)queueLaunchURL:(NSURL *)url
+{
+    if (!launchURLs) {
+        launchURLs = [NSMutableArray new];
+    }
+    [launchURLs addObject:url];
+}
+
+- (void)processLaunchURLs
+{
+    /* Native startup code can run the Cocoa loop before SDL_Init. Keep URLs
+     * until the SDL event pump can deliver them to the application. */
+    if (!(SDL_WasInit(SDL_INIT_EVENTS) & SDL_INIT_EVENTS)) {
+        return;
+    }
+    NSArray<NSURL *> *urls = [launchURLs copy];
+    [launchURLs removeAllObjects];
+    for (NSURL *url in urls) {
+        [self sendDropFileForURL:url];
+    }
 }
 
 - (UIWindow *)window
@@ -526,6 +647,63 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 #endif
 
 @end
+
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+@implementation SDLUIKitSceneDelegate
+
+- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions
+{
+    if (![scene isKindOfClass:UIWindowScene.class]) {
+        return;
+    }
+    SDLUIKitDelegate *delegate = [SDLUIKitDelegate sharedAppDelegate];
+    for (UIOpenURLContext *context in connectionOptions.URLContexts) {
+        [delegate queueLaunchURL:context.URL];
+    }
+    for (NSUserActivity *activity in connectionOptions.userActivities) {
+        if (activity.webpageURL) {
+            [delegate queueLaunchURL:activity.webpageURL];
+        }
+    }
+    [delegate connectWindowScene:(UIWindowScene *)scene];
+}
+
+- (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)contexts
+{
+    for (UIOpenURLContext *context in contexts) {
+        [[SDLUIKitDelegate sharedAppDelegate] queueLaunchURL:context.URL];
+    }
+}
+
+- (void)scene:(UIScene *)scene continueUserActivity:(NSUserActivity *)userActivity
+{
+    if (userActivity.webpageURL) {
+        [[SDLUIKitDelegate sharedAppDelegate] queueLaunchURL:userActivity.webpageURL];
+    }
+}
+
+#if !TARGET_OS_TV
+- (void)windowScene:(UIWindowScene *)scene didUpdateCoordinateSpace:(id<UICoordinateSpace>)previousCoordinateSpace interfaceOrientation:(UIInterfaceOrientation)previousInterfaceOrientation traitCollection:(UITraitCollection *)previousTraitCollection
+{
+    if (UIKit_GetInterfaceOrientation(scene.screen) != previousInterfaceOrientation) {
+        SDL_OnApplicationDidChangeStatusBarOrientation();
+    }
+}
+
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 270000
+- (void)windowScene:(UIWindowScene *)scene didUpdateEffectiveGeometry:(UIWindowSceneGeometry *)previousEffectiveGeometry API_AVAILABLE(ios(26.0))
+{
+    if (@available(iOS 26.0, *)) {
+        if (scene.effectiveGeometry.interfaceOrientation != previousEffectiveGeometry.interfaceOrientation) {
+            SDL_OnApplicationDidChangeStatusBarOrientation();
+        }
+    }
+}
+#endif
+#endif
+
+@end
+#endif /* SDL_UIKIT_SCENE_LIFECYCLE */
 
 #endif /* SDL_VIDEO_DRIVER_UIKIT */
 

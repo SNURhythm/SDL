@@ -29,6 +29,7 @@
 #include "SDL_uikitopengles.h"
 #include "SDL_uikitvideo.h"
 #include "SDL_uikitwindow.h"
+#import "SDL_uikitappdelegate.h"
 
 #import <Foundation/Foundation.h>
 
@@ -53,10 +54,22 @@ static BOOL UIKit_EventPumpEnabled = YES;
     NSNotificationCenter *notificationCenter = NSNotificationCenter.defaultCenter;
     if (UIKit_EventPumpEnabled && !self.isObservingNotifications) {
         self.isObservingNotifications = YES;
-        [notificationCenter addObserver:self selector:@selector(applicationDidBecomeActive) name:UIApplicationDidBecomeActiveNotification object:nil];
-        [notificationCenter addObserver:self selector:@selector(applicationWillResignActive) name:UIApplicationWillResignActiveNotification object:nil];
-        [notificationCenter addObserver:self selector:@selector(applicationDidEnterBackground) name:UIApplicationDidEnterBackgroundNotification object:nil];
-        [notificationCenter addObserver:self selector:@selector(applicationWillEnterForeground) name:UIApplicationWillEnterForegroundNotification object:nil];
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+        if (@available(iOS 13.0, tvOS 13.0, *)) {
+            if (UIKit_UsesSceneLifecycle()) {
+                [notificationCenter addObserver:self selector:@selector(applicationDidBecomeActive) name:UISceneDidActivateNotification object:nil];
+                [notificationCenter addObserver:self selector:@selector(applicationWillResignActive) name:UISceneWillDeactivateNotification object:nil];
+                [notificationCenter addObserver:self selector:@selector(applicationDidEnterBackground) name:UISceneDidEnterBackgroundNotification object:nil];
+                [notificationCenter addObserver:self selector:@selector(applicationWillEnterForeground) name:UISceneWillEnterForegroundNotification object:nil];
+            }
+        }
+#endif
+        if (!UIKit_UsesSceneLifecycle()) {
+            [notificationCenter addObserver:self selector:@selector(applicationDidBecomeActive) name:UIApplicationDidBecomeActiveNotification object:nil];
+            [notificationCenter addObserver:self selector:@selector(applicationWillResignActive) name:UIApplicationWillResignActiveNotification object:nil];
+            [notificationCenter addObserver:self selector:@selector(applicationDidEnterBackground) name:UIApplicationDidEnterBackgroundNotification object:nil];
+            [notificationCenter addObserver:self selector:@selector(applicationWillEnterForeground) name:UIApplicationWillEnterForegroundNotification object:nil];
+        }
         [notificationCenter addObserver:self selector:@selector(applicationWillTerminate) name:UIApplicationWillTerminateNotification object:nil];
         [notificationCenter addObserver:self selector:@selector(applicationDidReceiveMemoryWarning) name:UIApplicationDidReceiveMemoryWarningNotification object:nil];
 #if !TARGET_OS_TV
@@ -144,6 +157,13 @@ void UIKit_PumpEvents(_THIS)
     do {
         result = CFRunLoopRunInMode((CFStringRef)UITrackingRunLoopMode, seconds, TRUE);
     } while(result == kCFRunLoopRunHandledSource);
+
+    if (UIKit_UsesSceneLifecycle()) {
+        id delegate = [SDLUIKitDelegate sharedAppDelegate];
+        if ([delegate isKindOfClass:SDLUIKitDelegate.class]) {
+            [delegate processLaunchURLs];
+        }
+    }
 
     /* See the comment in the function definition. */
 #if defined(SDL_VIDEO_OPENGL_ES) || defined(SDL_VIDEO_OPENGL_ES2)

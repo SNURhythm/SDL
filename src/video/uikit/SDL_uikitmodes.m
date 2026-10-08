@@ -24,6 +24,7 @@
 
 #include "SDL_system.h"
 #include "SDL_uikitmodes.h"
+#import "SDL_uikitappdelegate.h"
 
 #include "../../events/SDL_events_c.h"
 
@@ -355,7 +356,7 @@ SDL_bool UIKit_IsDisplayLandscape(UIScreen *uiscreen)
 {
 #if !TARGET_OS_TV
     if (uiscreen == [UIScreen mainScreen]) {
-        return UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation);
+        return UIInterfaceOrientationIsLandscape(UIKit_GetInterfaceOrientation(UIScreen.mainScreen));
     } else
 #endif /* !TARGET_OS_TV */
     {
@@ -525,7 +526,7 @@ void UIKit_QuitModes(_THIS)
 #if !TARGET_OS_TV
 void SDL_OnApplicationDidChangeStatusBarOrientation(void)
 {
-    BOOL isLandscape = UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation);
+    BOOL isLandscape = UIInterfaceOrientationIsLandscape(UIKit_GetInterfaceOrientation(UIScreen.mainScreen));
     SDL_VideoDisplay *display = SDL_GetDisplay(0);
 
     if (display) {
@@ -550,7 +551,7 @@ void SDL_OnApplicationDidChangeStatusBarOrientation(void)
             currentmode->h = height;
         }
 
-        switch ([UIApplication sharedApplication].statusBarOrientation) {
+        switch (UIKit_GetInterfaceOrientation(UIScreen.mainScreen)) {
         case UIInterfaceOrientationPortrait:
             orientation = SDL_ORIENTATION_PORTRAIT;
             break;
