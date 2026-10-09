@@ -341,6 +341,7 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 
 static UIWindowScene *applicationWindowScene API_AVAILABLE(ios(13.0), tvos(13.0));
 static NSString *applicationSceneSession;
+static UIScreen *applicationScreen;
 static BOOL applicationStarted;
 
 UIWindowScene *UIKit_GetApplicationWindowScene(void)
@@ -355,7 +356,7 @@ UIScreen *UIKit_GetApplicationScreen(void)
             return applicationWindowScene.screen;
         }
     }
-    return UIScreen.mainScreen;
+    return applicationScreen ? applicationScreen : UIScreen.mainScreen;
 }
 
 UIInterfaceOrientation UIKit_GetApplicationOrientation(void)
@@ -388,23 +389,36 @@ API_AVAILABLE(ios(13.0))
 
     UIWindowScene *windowScene = (UIWindowScene *)scene;
     windowScene.delegate = self;
-    if (applicationSceneSession && ![applicationSceneSession isEqualToString:session.persistentIdentifier]) {
+    if (![session.role isEqualToString:UIWindowSceneSessionRoleApplication]) {
         return;
     }
+    if (applicationWindowScene && applicationWindowScene.activationState != UISceneActivationStateUnattached &&
+        ![applicationSceneSession isEqualToString:session.persistentIdentifier]) {
+        /* A connected primary owns the app. A discarded/disconnected primary
+         * may be replaced by a new session without restarting SDL_main. */
+        return;
+    }
+    UIScreen *previousScreen = UIKit_GetApplicationScreen();
     applicationSceneSession = session.persistentIdentifier;
     applicationWindowScene = windowScene;
+    applicationScreen = windowScene.screen;
+    if (!launchURLs) {
+        launchURLs = [NSMutableArray new];
+    }
+    for (NSUserActivity *activity in connectionOptions.userActivities) {
+        if (activity.webpageURL) {
+            [launchURLs addObject:activity.webpageURL];
+        }
+    }
+    for (UIOpenURLContext *context in connectionOptions.URLContexts) {
+        [launchURLs addObject:context.URL];
+    }
     if (applicationStarted) {
-        if (!launchURLs) {
-            launchURLs = [NSMutableArray new];
-        }
-        for (UIOpenURLContext *context in connectionOptions.URLContexts) {
-            [launchURLs addObject:context.URL];
-        }
         SDL_VideoDevice *video = SDL_GetVideoDevice();
         if (video) {
             for (SDL_Window *window = video->windows; window; window = window->next) {
                 SDL_UIKitWindowData *data = (__bridge SDL_UIKitWindowData *)window->internal;
-                if (data && data.uiwindow.screen == windowScene.screen) {
+                if (data && data.uiwindow.screen == previousScreen) {
                     data.uiwindow.windowScene = windowScene;
                     data.uiwindow.frame = windowScene.coordinateSpace.bounds;
                     [data.uiwindow makeKeyAndVisible];
@@ -458,20 +472,15 @@ API_AVAILABLE(ios(13.0))
     // Set working directory to resource path
     [[NSFileManager defaultManager] changeCurrentDirectoryPath:[bundle resourcePath]];
 
-    launchURLs = [[NSMutableArray alloc] init];
-
-    for (NSUserActivity *activity in connectionOptions.userActivities) {
-        if (activity.webpageURL) {
-            [launchURLs addObject:activity.webpageURL];
-        }
-    }
-
-    for (UIOpenURLContext *urlContext in connectionOptions.URLContexts) {
-        [launchURLs addObject:urlContext.URL];
-    }
-
     SDL_SetMainReady();
     [self performSelector:@selector(postFinishLaunch) withObject:nil afterDelay:0.0];
+}
+
+- (void)sceneDidDisconnect:(UIScene *)scene
+{
+    if (scene == applicationWindowScene) {
+        applicationWindowScene = nil;
+    }
 }
 
 - (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)URLContexts

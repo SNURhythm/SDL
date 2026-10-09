@@ -584,10 +584,16 @@ static void SDLCALL SDL_HideHomeIndicatorHintChanged(void *userdata, const char 
             markedText = @"";
         }
         if (selectedRange != nil) {
-            selectedStart = [textField offsetFromPosition:textField.markedTextRange.start
-                                               toPosition:selectedRange.start];
-            selectedLength = [textField offsetFromPosition:selectedRange.start
-                                                toPosition:selectedRange.end];
+            NSInteger startUTF16 = [textField offsetFromPosition:textField.markedTextRange.start
+                                                       toPosition:selectedRange.start];
+            NSInteger endUTF16 = [textField offsetFromPosition:textField.markedTextRange.start
+                                                     toPosition:selectedRange.end];
+            NSUInteger start = (NSUInteger)SDL_max(0, SDL_min(startUTF16, (NSInteger)markedText.length));
+            NSUInteger end = (NSUInteger)SDL_max((NSInteger)start, SDL_min(endUTF16, (NSInteger)markedText.length));
+            /* UITextInput positions count UTF-16 code units. SDL editing
+             * selections count Unicode characters in the UTF-8 event text. */
+            selectedStart = (NSInteger)SDL_utf8strlen([[markedText substringToIndex:start] UTF8String]);
+            selectedLength = (NSInteger)SDL_utf8strlen([[markedText substringWithRange:NSMakeRange(start, end - start)] UTF8String]);
         }
 
         hasMarkedText = YES;
