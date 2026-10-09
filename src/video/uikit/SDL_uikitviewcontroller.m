@@ -76,6 +76,8 @@ static void SDLCALL SDL_HideHomeIndicatorHintChanged(void *userdata, const char 
 #ifdef SDL_IPHONE_KEYBOARD
     SDLUITextField *textField;
     BOOL rotatingOrientation;
+    BOOL hasMarkedText;
+    BOOL clearingComposition;
     NSString *committedText;
     NSString *obligateForBackspace;
     BOOL isOTPMode;
@@ -567,7 +569,36 @@ static void SDLCALL SDL_HideHomeIndicatorHintChanged(void *userdata, const char 
 
 - (void)textFieldTextDidChange:(NSNotification *)notification
 {
-    if (textField.markedTextRange == nil) {
+    if (clearingComposition) {
+        committedText = textField.text;
+        return;
+    }
+
+    if (textField.markedTextRange != nil) {
+        NSString *markedText = [textField textInRange:textField.markedTextRange];
+        UITextRange *selectedRange = textField.selectedTextRange;
+        NSInteger selectedStart = 0;
+        NSInteger selectedLength = 0;
+
+        if (markedText == nil) {
+            markedText = @"";
+        }
+        if (selectedRange != nil) {
+            selectedStart = [textField offsetFromPosition:textField.markedTextRange.start
+                                               toPosition:selectedRange.start];
+            selectedLength = [textField offsetFromPosition:selectedRange.start
+                                                toPosition:selectedRange.end];
+        }
+
+        hasMarkedText = YES;
+        SDL_SendEditingText([markedText UTF8String], (int)SDL_max(0, selectedStart),
+                            (int)SDL_max(0, selectedLength));
+    } else {
+        if (hasMarkedText) {
+            SDL_SendEditingText("", 0, 0);
+            hasMarkedText = NO;
+        }
+
         if (isOTPMode && labs((NSInteger)textField.text.length - (NSInteger)committedText.length) != 1) {
             return;
         }
@@ -605,6 +636,26 @@ static void SDLCALL SDL_HideHomeIndicatorHintChanged(void *userdata, const char 
         }
         committedText = textField.text;
     }
+}
+
+- (void)clearComposition
+{
+    if (textField == nil) {
+        return;
+    }
+
+    clearingComposition = YES;
+    [textField unmarkText];
+    textField.text = obligateForBackspace;
+    UITextPosition *end = textField.endOfDocument;
+    if (end != nil) {
+        textField.selectedTextRange = [textField textRangeFromPosition:end toPosition:end];
+    }
+    committedText = textField.text;
+    clearingComposition = NO;
+
+    hasMarkedText = NO;
+    SDL_SendEditingText("", 0, 0);
 }
 
 - (void)updateKeyboard
@@ -670,6 +721,9 @@ static void SDLCALL SDL_HideHomeIndicatorHintChanged(void *userdata, const char 
 
 - (void)resetTextState
 {
+    if (hasMarkedText) {
+        [self clearComposition];
+    }
     if (!isOTPMode) {
         textField.text = obligateForBackspace;
         committedText = textField.text;
@@ -705,6 +759,15 @@ bool UIKit_StartTextInput(SDL_VideoDevice *_this, SDL_Window *window, SDL_Proper
     @autoreleasepool {
         SDL_uikitviewcontroller *vc = GetWindowViewController(window);
         return [vc startTextInput];
+    }
+}
+
+bool UIKit_ClearComposition(SDL_VideoDevice *_this, SDL_Window *window)
+{
+    @autoreleasepool {
+        SDL_uikitviewcontroller *vc = GetWindowViewController(window);
+        [vc clearComposition];
+        return true;
     }
 }
 

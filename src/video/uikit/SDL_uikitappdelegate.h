@@ -35,6 +35,7 @@ API_AVAILABLE(ios(13.0))
 + (NSString *)getSceneDelegateClassName;
 
 - (void)hideLaunchScreen;
+- (void)processLaunchURLs;
 
 @end
 
@@ -52,3 +53,8 @@ API_AVAILABLE(ios(13.0))
 @property(nonatomic) UIWindow *window;
 
 @end
+
+extern UIScreen *UIKit_GetApplicationScreen(void);
+extern UIWindowScene *UIKit_GetApplicationWindowScene(void) API_AVAILABLE(ios(13.0), tvos(13.0));
+
+extern UIInterfaceOrientation UIKit_GetApplicationOrientation(void);

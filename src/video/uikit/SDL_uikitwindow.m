@@ -78,7 +78,7 @@ static bool SetupWindowData(SDL_VideoDevice *_this, SDL_Window *window, UIWindow
     data.uiwindow = uiwindow;
 
 #ifndef SDL_PLATFORM_VISIONOS
-    if (displaydata.uiscreen != [UIScreen mainScreen]) {
+    if (displaydata.uiscreen != UIKit_GetApplicationScreen()) {
         window->flags &= ~SDL_WINDOW_RESIZABLE;   // window is NEVER resizable
         window->flags &= ~SDL_WINDOW_INPUT_FOCUS; // never has input focus
         window->flags |= SDL_WINDOW_BORDERLESS;   // never has a status bar.
@@ -86,7 +86,7 @@ static bool SetupWindowData(SDL_VideoDevice *_this, SDL_Window *window, UIWindow
 #endif
 
 #if !defined(SDL_PLATFORM_TVOS) && !defined(SDL_PLATFORM_VISIONOS)
-    if (displaydata.uiscreen == [UIScreen mainScreen]) {
+    if (displaydata.uiscreen == UIKit_GetApplicationScreen()) {
         NSUInteger orients = UIKit_GetSupportedOrientations(window);
         BOOL supportsLandscape = (orients & UIInterfaceOrientationMaskLandscape) != 0;
         BOOL supportsPortrait = (orients & (UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown)) != 0;
@@ -162,7 +162,7 @@ bool UIKit_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properti
             }
         }
 
-        if (data.uiscreen == [UIScreen mainScreen]) {
+        if (data.uiscreen == UIKit_GetApplicationScreen()) {
             if (window->flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS)) {
                 [UIApplication sharedApplication].statusBarHidden = YES;
             } else {
@@ -176,6 +176,15 @@ bool UIKit_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properti
             UIWindowScene *scene = (__bridge UIWindowScene *)SDL_GetPointerProperty(create_props, SDL_PROP_WINDOW_CREATE_WINDOWSCENE_POINTER, NULL);
             if (!scene) {
                 scene = UIKit_GetActiveWindowScene();
+                if (scene.screen != data.uiscreen) {
+                    scene = nil;
+                    for (UIScene *candidate in UIApplication.sharedApplication.connectedScenes) {
+                        if ([candidate isKindOfClass:UIWindowScene.class] && ((UIWindowScene *)candidate).screen == data.uiscreen) {
+                            scene = (UIWindowScene *)candidate;
+                            break;
+                        }
+                    }
+                }
             }
             if (scene) {
                 uiwindow = [[UIWindow alloc] initWithWindowScene:scene];
@@ -192,7 +201,7 @@ bool UIKit_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properti
 
         // put the window on an external display if appropriate.
 #ifndef SDL_PLATFORM_VISIONOS
-        if (data.uiscreen != [UIScreen mainScreen]) {
+        if (!uiwindow.windowScene && data.uiscreen != UIKit_GetApplicationScreen()) {
             [uiwindow setScreen:data.uiscreen];
         }
 #endif
@@ -242,7 +251,7 @@ void UIKit_ShowWindow(SDL_VideoDevice *_this, SDL_Window *window)
         SDL_VideoDisplay *display = SDL_GetVideoDisplayForWindow(window);
         SDL_UIKitDisplayData *displaydata = (__bridge SDL_UIKitDisplayData *)display->internal;
 #ifndef SDL_PLATFORM_VISIONOS
-        if (displaydata.uiscreen == [UIScreen mainScreen])
+        if (displaydata.uiscreen == UIKit_GetApplicationScreen())
 #endif
         {
             SDL_SetMouseFocus(window);
@@ -276,7 +285,7 @@ static void UIKit_UpdateWindowBorder(SDL_VideoDevice *_this, SDL_Window *window)
     SDL_uikitviewcontroller *viewcontroller = data.viewcontroller;
 
 #if !defined(SDL_PLATFORM_TVOS) && !defined(SDL_PLATFORM_VISIONOS)
-    if (data.uiwindow.screen == [UIScreen mainScreen]) {
+    if (data.uiwindow.screen == UIKit_GetApplicationScreen()) {
         if (window->flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS)) {
             [UIApplication sharedApplication].statusBarHidden = YES;
         } else {

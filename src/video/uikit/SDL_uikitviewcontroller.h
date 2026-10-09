@@ -91,6 +91,7 @@
 #ifdef SDL_IPHONE_KEYBOARD
 bool UIKit_HasScreenKeyboardSupport(SDL_VideoDevice *_this);
 bool UIKit_StartTextInput(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID props);
+bool UIKit_ClearComposition(SDL_VideoDevice *_this, SDL_Window *window);
 bool UIKit_StopTextInput(SDL_VideoDevice *_this, SDL_Window *window);
 void UIKit_SetTextInputProperties(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID props);
 bool UIKit_UpdateTextInputArea(SDL_VideoDevice *_this, SDL_Window *window);

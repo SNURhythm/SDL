@@ -339,6 +339,35 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 @end // SDLLaunchScreenController
 
 
+static UIWindowScene *applicationWindowScene API_AVAILABLE(ios(13.0), tvos(13.0));
+static NSString *applicationSceneSession;
+static BOOL applicationStarted;
+
+UIWindowScene *UIKit_GetApplicationWindowScene(void)
+{
+    return applicationWindowScene;
+}
+
+UIScreen *UIKit_GetApplicationScreen(void)
+{
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        if (applicationWindowScene) {
+            return applicationWindowScene.screen;
+        }
+    }
+    return UIScreen.mainScreen;
+}
+
+UIInterfaceOrientation UIKit_GetApplicationOrientation(void)
+{
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        if (applicationWindowScene) {
+            return applicationWindowScene.interfaceOrientation;
+        }
+    }
+    return UIApplication.sharedApplication.statusBarOrientation;
+}
+
 API_AVAILABLE(ios(13.0))
 @implementation SDLUIKitSceneDelegate
 {
@@ -359,6 +388,32 @@ API_AVAILABLE(ios(13.0))
 
     UIWindowScene *windowScene = (UIWindowScene *)scene;
     windowScene.delegate = self;
+    if (applicationSceneSession && ![applicationSceneSession isEqualToString:session.persistentIdentifier]) {
+        return;
+    }
+    applicationSceneSession = session.persistentIdentifier;
+    applicationWindowScene = windowScene;
+    if (applicationStarted) {
+        if (!launchURLs) {
+            launchURLs = [NSMutableArray new];
+        }
+        for (UIOpenURLContext *context in connectionOptions.URLContexts) {
+            [launchURLs addObject:context.URL];
+        }
+        SDL_VideoDevice *video = SDL_GetVideoDevice();
+        if (video) {
+            for (SDL_Window *window = video->windows; window; window = window->next) {
+                SDL_UIKitWindowData *data = (__bridge SDL_UIKitWindowData *)window->internal;
+                if (data && data.uiwindow.screen == windowScene.screen) {
+                    data.uiwindow.windowScene = windowScene;
+                    data.uiwindow.frame = windowScene.coordinateSpace.bounds;
+                    [data.uiwindow makeKeyAndVisible];
+                }
+            }
+        }
+        return;
+    }
+    applicationStarted = YES;
 
     NSBundle *bundle = [NSBundle mainBundle];
 
@@ -422,27 +477,55 @@ API_AVAILABLE(ios(13.0))
 - (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)URLContexts
 {
     for (UIOpenURLContext *context in URLContexts) {
-        [self handleURL:context.URL];
+        [launchURLs addObject:context.URL];
+    }
+}
+
+#if !defined(SDL_PLATFORM_TVOS) && !defined(SDL_PLATFORM_VISIONOS)
+- (void)windowScene:(UIWindowScene *)scene didUpdateCoordinateSpace:(id<UICoordinateSpace>)previousCoordinateSpace interfaceOrientation:(UIInterfaceOrientation)previousInterfaceOrientation traitCollection:(UITraitCollection *)previousTraitCollection
+{
+    if (scene == applicationWindowScene && scene.interfaceOrientation != previousInterfaceOrientation) {
+        SDL_OnApplicationDidChangeStatusBarOrientation();
+    }
+}
+#endif
+
+- (void)scene:(UIScene *)scene continueUserActivity:(NSUserActivity *)activity
+{
+    if (scene == applicationWindowScene && activity.webpageURL) {
+        [launchURLs addObject:activity.webpageURL];
     }
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene
 {
+    if (scene != applicationWindowScene) {
+        return;
+    }
     SDL_OnApplicationDidEnterForeground();
 }
 
 - (void)sceneWillResignActive:(UIScene *)scene
 {
+    if (scene != applicationWindowScene) {
+        return;
+    }
     SDL_OnApplicationWillEnterBackground();
 }
 
 - (void)sceneWillEnterForeground:(UIScene *)scene
 {
+    if (scene != applicationWindowScene) {
+        return;
+    }
     SDL_OnApplicationWillEnterForeground();
 }
 
 - (void)sceneDidEnterBackground:(UIScene *)scene
 {
+    if (scene != applicationWindowScene) {
+        return;
+    }
     SDL_OnApplicationDidEnterBackground();
 }
 
@@ -495,10 +578,15 @@ API_AVAILABLE(ios(13.0))
 
 - (void)processLaunchURLs
 {
-    for (NSURL *url in launchURLs) {
+    if (!(SDL_WasInit(SDL_INIT_EVENTS) & SDL_INIT_EVENTS)) {
+        return;
+    }
+    NSArray<NSURL *> *pendingURLs = [launchURLs copy];
+    [launchURLs removeAllObjects];
+    for (NSURL *url in pendingURLs) {
         [self handleURL:url];
     }
-    launchURLs = nil;
+
 }
 
 - (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession options:(UISceneConnectionOptions *)options API_AVAILABLE(ios(13.0))

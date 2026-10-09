@@ -23,6 +23,7 @@
 #ifdef SDL_VIDEO_DRIVER_UIKIT
 
 #include "SDL_uikitview.h"
+#include <SDL3/SDL_uikit_rawtouch.h>
 
 #include "../../events/SDL_mouse_c.h"
 #include "../../events/SDL_touch_c.h"
@@ -40,6 +41,69 @@
 
 // This is defined in SDL_sysjoystick.m
 extern int SDL_AppleTVRemoteOpenedAsJoystick;
+
+static SDL_SpinLock s_rawTouchLock;
+static IOSRawTouchEvent s_rawTouchEvents[512];
+static size_t s_rawTouchReadIndex;
+static size_t s_rawTouchCount;
+static IOSRawTouchEventSink s_rawTouchSink;
+static void *s_rawTouchSinkContext;
+
+void IOSSetRawTouchEventSink(IOSRawTouchEventSink sink, void *context)
+{
+    SDL_LockSpinlock(&s_rawTouchLock);
+    s_rawTouchSink = sink;
+    s_rawTouchSinkContext = context;
+    SDL_UnlockSpinlock(&s_rawTouchLock);
+}
+
+void IOSPushRawTouchEvent(IOSRawTouchPhase phase, Sint64 fingerId,
+                          float normalizedX, float normalizedY, float pressure,
+                          Uint64 timestampMicros)
+{
+    IOSRawTouchEvent rawTouchEvent;
+    size_t writeIndex;
+
+    rawTouchEvent.fingerId = fingerId;
+    rawTouchEvent.normalizedX = normalizedX;
+    rawTouchEvent.normalizedY = normalizedY;
+    rawTouchEvent.pressure = pressure;
+    rawTouchEvent.timestampMicros = timestampMicros;
+    rawTouchEvent.phase = phase;
+
+    SDL_LockSpinlock(&s_rawTouchLock);
+    if (s_rawTouchSink != NULL) {
+        s_rawTouchSink(&rawTouchEvent, s_rawTouchSinkContext);
+    }
+    writeIndex = (s_rawTouchReadIndex + s_rawTouchCount) % SDL_arraysize(s_rawTouchEvents);
+    s_rawTouchEvents[writeIndex] = rawTouchEvent;
+    if (s_rawTouchCount == SDL_arraysize(s_rawTouchEvents)) {
+        s_rawTouchReadIndex = (s_rawTouchReadIndex + 1) % SDL_arraysize(s_rawTouchEvents);
+    } else {
+        ++s_rawTouchCount;
+    }
+    SDL_UnlockSpinlock(&s_rawTouchLock);
+}
+
+size_t IOSPopRawTouchEvents(IOSRawTouchEvent *buffer, size_t maxEvents)
+{
+    size_t count;
+    size_t i;
+
+    if (buffer == NULL || maxEvents == 0) {
+        return 0;
+    }
+
+    SDL_LockSpinlock(&s_rawTouchLock);
+    count = SDL_min(maxEvents, s_rawTouchCount);
+    for (i = 0; i < count; ++i) {
+        buffer[i] = s_rawTouchEvents[(s_rawTouchReadIndex + i) % SDL_arraysize(s_rawTouchEvents)];
+    }
+    s_rawTouchReadIndex = (s_rawTouchReadIndex + count) % SDL_arraysize(s_rawTouchEvents);
+    s_rawTouchCount -= count;
+    SDL_UnlockSpinlock(&s_rawTouchLock);
+    return count;
+}
 
 @implementation SDL_uikitview
 {
@@ -359,6 +423,9 @@ extern int SDL_AppleTVRemoteOpenedAsJoystick;
         // FIXME, need to send: int clicks = (int) touch.tapCount; ?
 
         CGPoint locationInView = [self touchLocation:touch shouldNormalize:YES];
+        IOSPushRawTouchEvent(IOSRawTouchPhaseBegan, (Sint64)((size_t)touch),
+                             locationInView.x, locationInView.y, pressure,
+                             (Uint64)(touch.timestamp * 1000000.0));
         SDL_SendTouch(UIKit_GetEventTimestamp([event timestamp]),
                       touchId, (SDL_FingerID)(uintptr_t)touch, sdlwindow,
                       SDL_EVENT_FINGER_DOWN, locationInView.x, locationInView.y, pressure);
@@ -395,6 +462,9 @@ extern int SDL_AppleTVRemoteOpenedAsJoystick;
         // FIXME, need to send: int clicks = (int) touch.tapCount; ?
 
         CGPoint locationInView = [self touchLocation:touch shouldNormalize:YES];
+        IOSPushRawTouchEvent(IOSRawTouchPhaseEnded, (Sint64)((size_t)touch),
+                             locationInView.x, locationInView.y, pressure,
+                             (Uint64)(touch.timestamp * 1000000.0));
         SDL_SendTouch(UIKit_GetEventTimestamp([event timestamp]),
                       touchId, (SDL_FingerID)(uintptr_t)touch, sdlwindow,
                       SDL_EVENT_FINGER_UP, locationInView.x, locationInView.y, pressure);
@@ -429,6 +499,9 @@ extern int SDL_AppleTVRemoteOpenedAsJoystick;
         }
 
         CGPoint locationInView = [self touchLocation:touch shouldNormalize:YES];
+        IOSPushRawTouchEvent(IOSRawTouchPhaseCancelled, (Sint64)((size_t)touch),
+                             locationInView.x, locationInView.y, pressure,
+                             (Uint64)(touch.timestamp * 1000000.0));
         SDL_SendTouch(UIKit_GetEventTimestamp([event timestamp]),
                       touchId, (SDL_FingerID)(uintptr_t)touch, sdlwindow,
                       SDL_EVENT_FINGER_CANCELED, locationInView.x, locationInView.y, pressure);
@@ -463,6 +536,9 @@ extern int SDL_AppleTVRemoteOpenedAsJoystick;
         }
 
         CGPoint locationInView = [self touchLocation:touch shouldNormalize:YES];
+        IOSPushRawTouchEvent(IOSRawTouchPhaseMoved, (Sint64)((size_t)touch),
+                             locationInView.x, locationInView.y, pressure,
+                             (Uint64)(touch.timestamp * 1000000.0));
         SDL_SendTouchMotion(UIKit_GetEventTimestamp([event timestamp]),
                             touchId, (SDL_FingerID)(uintptr_t)touch, sdlwindow,
                             locationInView.x, locationInView.y, pressure);

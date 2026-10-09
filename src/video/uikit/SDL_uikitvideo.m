@@ -30,6 +30,7 @@
 #include "../../events/SDL_events_c.h"
 
 #include "SDL_uikitvideo.h"
+#import "SDL_uikitappdelegate.h"
 #include "SDL_uikitevents.h"
 #include "SDL_uikitmodes.h"
 #include "SDL_uikitwindow.h"
@@ -102,6 +103,7 @@ static SDL_VideoDevice *UIKit_CreateDevice(void)
         device->HasScreenKeyboardSupport = UIKit_HasScreenKeyboardSupport;
         device->StartTextInput = UIKit_StartTextInput;
         device->StopTextInput = UIKit_StopTextInput;
+        device->ClearComposition = UIKit_ClearComposition;
         device->SetTextInputProperties = UIKit_SetTextInputProperties;
         device->UpdateTextInputArea = UIKit_UpdateTextInputArea;
 #endif
@@ -237,7 +239,7 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
      * https://bugzilla.libsdl.org/show_bug.cgi?id=3505
      * https://bugzilla.libsdl.org/show_bug.cgi?id=3465
      * https://forums.developer.apple.com/thread/65337 */
-    UIInterfaceOrientation orient = [UIApplication sharedApplication].statusBarOrientation;
+    UIInterfaceOrientation orient = UIKit_GetApplicationOrientation();
     BOOL landscape = UIInterfaceOrientationIsLandscape(orient) ||
                     !(UIKit_GetSupportedOrientations(window) & (UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown));
     BOOL fullscreen = CGRectEqualToRect(screen.bounds, frame);
@@ -258,6 +260,10 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
 UIWindowScene *UIKit_GetActiveWindowScene(void)
 {
     if (@available(iOS 13.0, tvOS 13.0, *)) {
+        UIWindowScene *applicationScene = UIKit_GetApplicationWindowScene();
+        if (applicationScene) {
+            return applicationScene;
+        }
         NSSet<UIScene *> *connectedScenes = [UIApplication sharedApplication].connectedScenes;
 
         // First, try to find an active foreground scene

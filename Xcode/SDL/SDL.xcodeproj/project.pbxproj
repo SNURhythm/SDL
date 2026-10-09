@@ -33,6 +33,7 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+        AABBCCDDEEFF001122334455 /* SDL_uikit_rawtouch.h in Headers */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334456; settings = {ATTRIBUTES = (Public, ); }; };
 		0000140640E77F73F1DF0000 /* SDL_dialog_utils.c in Sources */ = {isa = PBXBuildFile; fileRef = 0000F6C6A072ED4E3D660000 /* SDL_dialog_utils.c */; };
 		00001B2471F503DD3C1B0000 /* SDL_camera_dummy.c in Sources */ = {isa = PBXBuildFile; fileRef = 00005BD74B46358B33A20000 /* SDL_camera_dummy.c */; };
 		000028F8113A53F4333E0000 /* SDL_main_callbacks.c in Sources */ = {isa = PBXBuildFile; fileRef = 00009366FB9FBBD54C390000 /* SDL_main_callbacks.c */; };
@@ -581,6 +582,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+        AABBCCDDEEFF001122334456 /* SDL_uikit_rawtouch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ../../include/SDL3/SDL_uikit_rawtouch.h; sourceTree = SOURCE_ROOT; };
 		0000035D38C3899C7EFD0000 /* SDL_camera.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = SDL_camera.c; sourceTree = "<group>"; };
 		00002B010DB1A70931C20000 /* SDL_filesystem.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = SDL_filesystem.c; sourceTree = "<group>"; };
 		00002F2F5496FA184A0F0000 /* SDL_cocoapen.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SDL_cocoapen.h; sourceTree = "<group>"; };
@@ -2726,6 +2728,7 @@
 				A7D8BBE023E2574800DCD162 /* SDL_uikitopenglview.h in Headers */,
 				A7D8BBE223E2574800DCD162 /* SDL_uikitvideo.h in Headers */,
 				A7D8BBE423E2574800DCD162 /* SDL_uikitview.h in Headers */,
+                AABBCCDDEEFF001122334455 /* SDL_uikit_rawtouch.h in Headers */,
 				A7D8BBE623E2574800DCD162 /* SDL_uikitviewcontroller.h in Headers */,
 				A7D8BBE823E2574800DCD162 /* SDL_uikitvulkan.h in Headers */,
 				A7D8BBEA23E2574800DCD162 /* SDL_uikitwindow.h in Headers */,
@@ -3186,7 +3189,7 @@
 					/usr/X11R6/include,
 				);
 				INFOPLIST_FILE = "Info-Framework.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -3249,7 +3252,7 @@
 					/usr/X11R6/include,
 				);
 				INFOPLIST_FILE = "Info-Framework.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

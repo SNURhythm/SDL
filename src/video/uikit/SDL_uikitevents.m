@@ -29,6 +29,7 @@
 #include "SDL_uikitopengles.h"
 #include "SDL_uikitvideo.h"
 #include "SDL_uikitwindow.h"
+#import "SDL_uikitappdelegate.h"
 
 #import <Foundation/Foundation.h>
 #import <GameController/GameController.h>
@@ -149,6 +150,13 @@ Uint64 UIKit_GetEventTimestamp(NSTimeInterval nsTimestamp)
 
 void UIKit_PumpEvents(SDL_VideoDevice *_this)
 {
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        UIWindowScene *scene = UIKit_GetApplicationWindowScene();
+        if ([scene.delegate respondsToSelector:@selector(processLaunchURLs)]) {
+            [(id)scene.delegate processLaunchURLs];
+        }
+    }
+
     if (!UIKit_EventPumpEnabled) {
         return;
     }

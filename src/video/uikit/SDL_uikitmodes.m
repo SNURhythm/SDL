@@ -23,6 +23,7 @@
 #ifdef SDL_VIDEO_DRIVER_UIKIT
 
 #include "SDL_uikitmodes.h"
+#import "SDL_uikitappdelegate.h"
 
 #include "../../events/SDL_events_c.h"
 
@@ -225,7 +226,7 @@ bool UIKit_AddDisplay(UIScreen *uiscreen, bool send_event)
 
     SDL_zero(display);
 #ifndef SDL_PLATFORM_TVOS
-    if (uiscreen == [UIScreen mainScreen]) {
+    if (uiscreen == UIKit_GetApplicationScreen()) {
         // The natural orientation (used by sensors) is portrait
         display.natural_orientation = SDL_ORIENTATION_PORTRAIT;
     } else
@@ -329,8 +330,8 @@ void UIKit_DelDisplay(UIScreen *uiscreen, bool send_event)
 bool UIKit_IsDisplayLandscape(UIScreen *uiscreen)
 {
 #ifndef SDL_PLATFORM_TVOS
-    if (uiscreen == [UIScreen mainScreen]) {
-        return UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation);
+    if (uiscreen == UIKit_GetApplicationScreen()) {
+        return UIInterfaceOrientationIsLandscape(UIKit_GetApplicationOrientation());
     } else
 #endif // !SDL_PLATFORM_TVOS
     {
@@ -345,7 +346,14 @@ bool UIKit_InitModes(SDL_VideoDevice *_this)
 #ifdef SDL_PLATFORM_VISIONOS
         UIKit_AddDisplay(false);
 #else
+        UIScreen *applicationScreen = UIKit_GetApplicationScreen();
+        if (!UIKit_AddDisplay(applicationScreen, false)) {
+            return false;
+        }
         for (UIScreen *uiscreen in [UIScreen screens]) {
+            if (uiscreen == applicationScreen) {
+                continue;
+            }
             if (!UIKit_AddDisplay(uiscreen, false)) {
                 return false;
             }
@@ -371,7 +379,7 @@ bool UIKit_GetDisplayModes(SDL_VideoDevice *_this, SDL_VideoDisplay *display)
         SDL_UIKitDisplayData *data = (__bridge SDL_UIKitDisplayData *)display->internal;
 
         bool isLandscape = UIKit_IsDisplayLandscape(data.uiscreen);
-        bool addRotation = (data.uiscreen == [UIScreen mainScreen]);
+        bool addRotation = (data.uiscreen == UIKit_GetApplicationScreen());
         NSArray *availableModes = nil;
 
 #ifdef SDL_PLATFORM_TVOS
@@ -411,7 +419,7 @@ bool UIKit_SetDisplayMode(SDL_VideoDevice *_this, SDL_VideoDisplay *display, SDL
         [data.uiscreen setCurrentMode:modedata.uiscreenmode];
 #endif
 
-        if (data.uiscreen == [UIScreen mainScreen]) {
+        if (data.uiscreen == UIKit_GetApplicationScreen()) {
             /* [UIApplication setStatusBarOrientation:] no longer works reliably
              * in recent iOS versions, so we can't rotate the screen when setting
              * the display mode. */
@@ -484,7 +492,7 @@ void UIKit_QuitModes(SDL_VideoDevice *_this)
 #if !defined(SDL_PLATFORM_TVOS) && !defined(SDL_PLATFORM_VISIONOS)
 void SDL_OnApplicationDidChangeStatusBarOrientation(void)
 {
-    BOOL isLandscape = UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation);
+    BOOL isLandscape = UIInterfaceOrientationIsLandscape(UIKit_GetApplicationOrientation());
     SDL_VideoDisplay *display = SDL_GetVideoDisplay(SDL_GetPrimaryDisplay());
 
     if (display) {
@@ -518,7 +526,7 @@ void SDL_OnApplicationDidChangeStatusBarOrientation(void)
             }
         }
 
-        switch ([UIApplication sharedApplication].statusBarOrientation) {
+        switch (UIKit_GetApplicationOrientation()) {
         case UIInterfaceOrientationPortrait:
             orientation = SDL_ORIENTATION_PORTRAIT;
             break;
