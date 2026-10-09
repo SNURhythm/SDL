@@ -222,7 +222,7 @@ CGRect UIKit_ComputeViewFrame(SDL_Window *window, UIScreen *screen)
      * https://bugzilla.libsdl.org/show_bug.cgi?id=3505
      * https://bugzilla.libsdl.org/show_bug.cgi?id=3465
      * https://forums.developer.apple.com/thread/65337 */
-    orient = UIKit_GetInterfaceOrientation(UIScreen.mainScreen);
+    orient = UIKit_GetInterfaceOrientation(screen);
     landscape = UIInterfaceOrientationIsLandscape(orient) ||
                     !(UIKit_GetSupportedOrientations(window) & (UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown));
     fullscreen = CGRectEqualToRect(screen.bounds, frame);

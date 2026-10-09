@@ -58,8 +58,28 @@ BOOL UIKit_UsesSceneLifecycle(void)
 }
 
 #ifdef SDL_UIKIT_SCENE_LIFECYCLE
+/* Keep the scene from willConnect, which may not yet be in connectedScenes. */
+static UIWindowScene *applicationWindowScene API_AVAILABLE(ios(13.0), tvos(13.0));
+#endif
+
+UIScreen *UIKit_GetApplicationScreen(void)
+{
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
+    if (@available(iOS 13.0, tvOS 13.0, *)) {
+        if (applicationWindowScene) {
+            return applicationWindowScene.screen;
+        }
+    }
+#endif
+    return UIScreen.mainScreen;
+}
+
+#ifdef SDL_UIKIT_SCENE_LIFECYCLE
 UIWindowScene *UIKit_GetWindowScene(UIScreen *screen)
 {
+    if (applicationWindowScene.screen == screen) {
+        return applicationWindowScene;
+    }
     UIWindowScene *candidate = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if ([scene isKindOfClass:UIWindowScene.class] && ((UIWindowScene *)scene).screen == screen) {
@@ -146,7 +166,7 @@ SDL_IdleTimerDisabledChanged(void *userdata, const char *name, const char *oldVa
 /* Load a launch image using the old UILaunchImageFile-era naming rules. */
 static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 {
-    UIInterfaceOrientation curorient = UIKit_GetInterfaceOrientation(UIScreen.mainScreen);
+    UIInterfaceOrientation curorient = UIKit_GetInterfaceOrientation(UIKit_GetApplicationScreen());
     UIUserInterfaceIdiom idiom = [UIDevice currentDevice].userInterfaceIdiom;
     UIImage *image = nil;
 
@@ -272,11 +292,11 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
         NSString *imagename = nil;
         UIImage *image = nil;
 
-        int screenw = (int)([UIScreen mainScreen].bounds.size.width + 0.5);
-        int screenh = (int)([UIScreen mainScreen].bounds.size.height + 0.5);
+        int screenw = (int)(UIKit_GetApplicationScreen().bounds.size.width + 0.5);
+        int screenh = (int)(UIKit_GetApplicationScreen().bounds.size.height + 0.5);
 
 #if !TARGET_OS_TV
-        UIInterfaceOrientation curorient = UIKit_GetInterfaceOrientation(UIScreen.mainScreen);
+        UIInterfaceOrientation curorient = UIKit_GetInterfaceOrientation(UIKit_GetApplicationScreen());
 
         /* We always want portrait-oriented size, to match UILaunchImageSize. */
         if (screenw > screenh) {
@@ -353,7 +373,7 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 #endif
 
         if (image) {
-            UIImageView *view = [[UIImageView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+            UIImageView *view = [[UIImageView alloc] initWithFrame:UIKit_GetApplicationScreen().bounds];
             UIImageOrientation imageorient = UIImageOrientationUp;
 
 #if !TARGET_OS_TV
@@ -522,7 +542,7 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
     if (vc.view) {
 #ifdef SDL_UIKIT_SCENE_LIFECYCLE
         if (@available(iOS 13.0, tvOS 13.0, *)) {
-            UIWindowScene *scene = UIKit_GetWindowScene(UIScreen.mainScreen);
+            UIWindowScene *scene = UIKit_GetWindowScene(UIKit_GetApplicationScreen());
             if (scene) {
                 launchWindow = [[UIWindow alloc] initWithWindowScene:scene];
                 launchWindow.frame = scene.coordinateSpace.bounds;
@@ -530,7 +550,7 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
         }
 #endif
         if (!launchWindow) {
-            launchWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+            launchWindow = [[UIWindow alloc] initWithFrame:UIKit_GetApplicationScreen().bounds];
         }
 
         /* We don't want the launch window immediately hidden when a real SDL
@@ -561,6 +581,7 @@ static UIImage *SDL_LoadLaunchImageNamed(NSString *name, int screenh)
 #ifdef SDL_UIKIT_SCENE_LIFECYCLE
 - (void)connectWindowScene:(UIWindowScene *)scene
 {
+    applicationWindowScene = scene;
     if (applicationStarted) {
         /* UIKit may reconnect a discarded session without restarting the process. */
         UIWindow *window = self.window;

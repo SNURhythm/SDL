@@ -46,3 +46,16 @@ Check these behaviors; each process entry appends `MAIN`:
 Stop the fixture after testing. On simulators with several integrated displays,
 `simctl io ... screenshot` can select an inactive display; use `enumerate` and
 an explicit `--display` or inspect the simulator frontend.
+
+For display selection without external-display hardware, run on macOS:
+
+```sh
+python3 test/ios-scene/test_display_selection.py
+```
+
+This compiles the production scene helpers, connection callback, display
+initialization and window-show function against small Foundation-based UIKit
+doubles. It covers legacy display ordering, internal and external app scenes,
+input focus, a connecting scene absent from `connectedScenes`, and reconnection
+while the old scene remains in that set. Use an iPad with an extended display to
+confirm actual external-screen rendering and window movement.

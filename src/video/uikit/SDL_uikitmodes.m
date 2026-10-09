@@ -355,8 +355,8 @@ void UIKit_DelDisplay(UIScreen *uiscreen)
 SDL_bool UIKit_IsDisplayLandscape(UIScreen *uiscreen)
 {
 #if !TARGET_OS_TV
-    if (uiscreen == [UIScreen mainScreen]) {
-        return UIInterfaceOrientationIsLandscape(UIKit_GetInterfaceOrientation(UIScreen.mainScreen));
+    if (uiscreen == UIKit_GetApplicationScreen()) {
+        return UIInterfaceOrientationIsLandscape(UIKit_GetInterfaceOrientation(UIKit_GetApplicationScreen()));
     } else
 #endif /* !TARGET_OS_TV */
     {
@@ -368,7 +368,16 @@ SDL_bool UIKit_IsDisplayLandscape(UIScreen *uiscreen)
 int UIKit_InitModes(_THIS)
 {
     @autoreleasepool {
+        /* SDL's default display must host the application, even when UIKit
+         * connects its scene on an external screen. */
+        UIScreen *applicationScreen = UIKit_GetApplicationScreen();
+        if (UIKit_AddDisplay(applicationScreen, SDL_FALSE) < 0) {
+            return -1;
+        }
         for (UIScreen *uiscreen in [UIScreen screens]) {
+            if (uiscreen == applicationScreen) {
+                continue;
+            }
             if (UIKit_AddDisplay(uiscreen, SDL_FALSE) < 0) {
                 return -1;
             }
@@ -389,7 +398,7 @@ void UIKit_GetDisplayModes(_THIS, SDL_VideoDisplay * display)
         SDL_DisplayData *data = (__bridge SDL_DisplayData *) display->driverdata;
 
         SDL_bool isLandscape = UIKit_IsDisplayLandscape(data.uiscreen);
-        SDL_bool addRotation = (data.uiscreen == [UIScreen mainScreen]);
+        SDL_bool addRotation = (data.uiscreen == UIKit_GetApplicationScreen());
         CGFloat scale = data.uiscreen.scale;
         NSArray *availableModes = nil;
 
@@ -457,7 +466,7 @@ int UIKit_SetDisplayMode(_THIS, SDL_VideoDisplay * display, SDL_DisplayMode * mo
         [data.uiscreen setCurrentMode:modedata.uiscreenmode];
 #endif
 
-        if (data.uiscreen == [UIScreen mainScreen]) {
+        if (data.uiscreen == UIKit_GetApplicationScreen()) {
             /* [UIApplication setStatusBarOrientation:] no longer works reliably
              * in recent iOS versions, so we can't rotate the screen when setting
              * the display mode. */
@@ -526,8 +535,15 @@ void UIKit_QuitModes(_THIS)
 #if !TARGET_OS_TV
 void SDL_OnApplicationDidChangeStatusBarOrientation(void)
 {
-    BOOL isLandscape = UIInterfaceOrientationIsLandscape(UIKit_GetInterfaceOrientation(UIScreen.mainScreen));
-    SDL_VideoDisplay *display = SDL_GetDisplay(0);
+    BOOL isLandscape = UIInterfaceOrientationIsLandscape(UIKit_GetInterfaceOrientation(UIKit_GetApplicationScreen()));
+    SDL_VideoDisplay *display = NULL;
+    for (int i = 0; i < SDL_GetNumVideoDisplays(); ++i) {
+        SDL_DisplayData *data = (__bridge SDL_DisplayData *)SDL_GetDisplayDriverData(i);
+        if (data.uiscreen == UIKit_GetApplicationScreen()) {
+            display = SDL_GetDisplay(i);
+            break;
+        }
+    }
 
     if (display) {
         SDL_DisplayMode *desktopmode = &display->desktop_mode;
@@ -551,7 +567,7 @@ void SDL_OnApplicationDidChangeStatusBarOrientation(void)
             currentmode->h = height;
         }
 
-        switch (UIKit_GetInterfaceOrientation(UIScreen.mainScreen)) {
+        switch (UIKit_GetInterfaceOrientation(UIKit_GetApplicationScreen())) {
         case UIInterfaceOrientationPortrait:
             orientation = SDL_ORIENTATION_PORTRAIT;
             break;

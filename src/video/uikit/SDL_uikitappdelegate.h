@@ -56,6 +56,7 @@ extern UIWindowScene *UIKit_GetWindowScene(UIScreen *screen) API_AVAILABLE(ios(1
 #endif
 
 extern BOOL UIKit_UsesSceneLifecycle(void);
+extern UIScreen *UIKit_GetApplicationScreen(void);
 #if !TARGET_OS_TV
 extern UIInterfaceOrientation UIKit_GetInterfaceOrientation(UIScreen *screen);
 #endif

@@ -106,14 +106,14 @@ static int SetupWindowData(_THIS, SDL_Window *window, UIWindow *uiwindow, SDL_bo
     /* only one window on iOS, always shown */
     window->flags &= ~SDL_WINDOW_HIDDEN;
 
-    if (displaydata.uiscreen != [UIScreen mainScreen]) {
+    if (displaydata.uiscreen != UIKit_GetApplicationScreen()) {
         window->flags &= ~SDL_WINDOW_RESIZABLE;  /* window is NEVER resizable */
         window->flags &= ~SDL_WINDOW_INPUT_FOCUS;  /* never has input focus */
         window->flags |= SDL_WINDOW_BORDERLESS;  /* never has a status bar. */
     }
 
 #if !TARGET_OS_TV
-    if (displaydata.uiscreen == [UIScreen mainScreen]) {
+    if (displaydata.uiscreen == UIKit_GetApplicationScreen()) {
         NSUInteger orients = UIKit_GetSupportedOrientations(window);
         BOOL supportsLandscape = (orients & UIInterfaceOrientationMaskLandscape) != 0;
         BOOL supportsPortrait = (orients & (UIInterfaceOrientationMaskPortrait|UIInterfaceOrientationMaskPortraitUpsideDown)) != 0;
@@ -196,7 +196,7 @@ int UIKit_CreateWindow(_THIS, SDL_Window *window)
             }
         }
 
-        if (data.uiscreen == [UIScreen mainScreen]) {
+        if (data.uiscreen == UIKit_GetApplicationScreen()) {
             if (window->flags & (SDL_WINDOW_FULLSCREEN|SDL_WINDOW_BORDERLESS)) {
                 [UIApplication sharedApplication].statusBarHidden = YES;
             } else {
@@ -255,7 +255,7 @@ void UIKit_ShowWindow(_THIS, SDL_Window * window)
         /* Make this window the current mouse focus for touch input */
         display = SDL_GetDisplayForWindow(window);
         displaydata = (__bridge SDL_DisplayData *) display->driverdata;
-        if (displaydata.uiscreen == [UIScreen mainScreen]) {
+        if (displaydata.uiscreen == UIKit_GetApplicationScreen()) {
             SDL_SetMouseFocus(window);
             SDL_SetKeyboardFocus(window);
         }
@@ -285,7 +285,7 @@ static void UIKit_UpdateWindowBorder(_THIS, SDL_Window * window)
     SDL_uikitviewcontroller *viewcontroller = data.viewcontroller;
 
 #if !TARGET_OS_TV
-    if (data.uiwindow.screen == [UIScreen mainScreen]) {
+    if (data.uiwindow.screen == UIKit_GetApplicationScreen()) {
         if (window->flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS)) {
             [UIApplication sharedApplication].statusBarHidden = YES;
         } else {
