@@ -76,21 +76,33 @@ static BOOL UIKit_EventPumpEnabled = YES;
 
 - (void)applicationDidBecomeActive
 {
+    if (UIKit_UsesSceneLifecycle()) {
+        return;
+    }
     SDL_OnApplicationDidEnterForeground();
 }
 
 - (void)applicationWillResignActive
 {
+    if (UIKit_UsesSceneLifecycle()) {
+        return;
+    }
     SDL_OnApplicationWillEnterBackground();
 }
 
 - (void)applicationDidEnterBackground
 {
+    if (UIKit_UsesSceneLifecycle()) {
+        return;
+    }
     SDL_OnApplicationDidEnterBackground();
 }
 
 - (void)applicationWillEnterForeground
 {
+    if (UIKit_UsesSceneLifecycle()) {
+        return;
+    }
     SDL_OnApplicationWillEnterForeground();
 }
 

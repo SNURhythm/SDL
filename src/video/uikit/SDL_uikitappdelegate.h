@@ -54,6 +54,7 @@ API_AVAILABLE(ios(13.0))
 
 @end
 
+extern BOOL UIKit_UsesSceneLifecycle(void);
 extern UIScreen *UIKit_GetApplicationScreen(void);
 extern UIWindowScene *UIKit_GetApplicationWindowScene(void) API_AVAILABLE(ios(13.0), tvos(13.0));
 

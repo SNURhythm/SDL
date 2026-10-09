@@ -344,6 +344,13 @@ static NSString *applicationSceneSession;
 static UIScreen *applicationScreen;
 static BOOL applicationStarted;
 
+BOOL UIKit_UsesSceneLifecycle(void)
+{
+    /* Keep scene ownership across disconnection/reconnection. Application-wide
+     * notifications must not stand in for an absent primary scene. */
+    return applicationStarted;
+}
+
 UIWindowScene *UIKit_GetApplicationWindowScene(void)
 {
     return applicationWindowScene;

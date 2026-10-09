@@ -70,3 +70,15 @@ This compiles the production marked-text branch with UTF-16 UITextInput position
 doubles. It covers a cursor after a supplementary-plane emoji, a selected emoji,
 a Korean character after an emoji, and a missing selected range. It verifies SDL
 character counts while preserving the original marked UTF-8 event text.
+
+For exclusive application/scene lifecycle dispatch on macOS:
+
+```sh
+python3 test/ios-scene/test_lifecycle_delivery.py
+```
+
+This invokes the production application notification observer and scene delegate
+through actual Foundation notification delivery. It covers legacy dispatch, one
+copy from the primary scene, ignored secondary/disconnected scene transitions, a
+switch to scene mode after notification registration, and observer removal.
+Termination and memory-warning notifications remain application-wide.
