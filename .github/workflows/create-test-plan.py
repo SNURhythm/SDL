@@ -520,7 +520,7 @@ def spec_to_job(spec: JobSpec, key: str, trackmem_symbol_names: bool) -> JobDeta
                     job.cmake_arguments.extend([
                         "-DCMAKE_SYSTEM_NAME=iOS",
                         "-DCMAKE_OSX_ARCHITECTURES=\"arm64\"",
-                        "-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0",
+                        "-DCMAKE_OSX_DEPLOYMENT_TARGET=15.0",
                     ])
                 case SdlPlatform.Tvos:
                     if spec.xcode:

@@ -201,7 +201,11 @@ bool UIKit_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properti
 
         // put the window on an external display if appropriate.
 #ifndef SDL_PLATFORM_VISIONOS
-        if (!uiwindow.windowScene && data.uiscreen != UIKit_GetApplicationScreen()) {
+        BOOL hasWindowScene = NO;
+        if (@available(iOS 13.0, tvOS 13.0, *)) {
+            hasWindowScene = (uiwindow.windowScene != nil);
+        }
+        if (!hasWindowScene && data.uiscreen != UIKit_GetApplicationScreen()) {
             [uiwindow setScreen:data.uiscreen];
         }
 #endif

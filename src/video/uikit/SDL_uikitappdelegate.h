@@ -58,4 +58,6 @@ extern BOOL UIKit_UsesSceneLifecycle(void);
 extern UIScreen *UIKit_GetApplicationScreen(void);
 extern UIWindowScene *UIKit_GetApplicationWindowScene(void) API_AVAILABLE(ios(13.0), tvos(13.0));
 
+#if !defined(SDL_PLATFORM_TVOS) && !defined(SDL_PLATFORM_VISIONOS)
 extern UIInterfaceOrientation UIKit_GetApplicationOrientation(void);
+#endif

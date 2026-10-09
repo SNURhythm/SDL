@@ -366,6 +366,7 @@ UIScreen *UIKit_GetApplicationScreen(void)
     return applicationScreen ? applicationScreen : UIScreen.mainScreen;
 }
 
+#if !defined(SDL_PLATFORM_TVOS) && !defined(SDL_PLATFORM_VISIONOS)
 UIInterfaceOrientation UIKit_GetApplicationOrientation(void)
 {
     if (@available(iOS 13.0, tvOS 13.0, *)) {
@@ -375,6 +376,7 @@ UIInterfaceOrientation UIKit_GetApplicationOrientation(void)
     }
     return UIApplication.sharedApplication.statusBarOrientation;
 }
+#endif
 
 API_AVAILABLE(ios(13.0))
 @implementation SDLUIKitSceneDelegate
